@@ -62,6 +62,14 @@ library
   other-modules:
     GhcExts
     WithIndex
+  Default-Extensions:
+        PartialTypeConstructors
+        FlexibleContexts
+        -- Needed for PTC annotations
+        QuantifiedConstraints
+        TypeOperators
+        ExplicitNamespaces
+        UndecidableInstances
 
   exposed-modules:
     Data.Foldable.WithIndex
@@ -86,7 +94,7 @@ library
       , semigroups           >=0.18.4 && <0.21
       , transformers-compat  >=0.6.6  && <0.8
 
-  if (impl(ghc >=7.0) && impl(ghc <7.6))
+  if (impl(ghc >=7.0) && impl(ghc <7.6)) || (impl(ghc >= 9.3))
     build-depends: ghc-prim
 
   if (impl(ghc >=7.0) && impl(ghc <7.2))

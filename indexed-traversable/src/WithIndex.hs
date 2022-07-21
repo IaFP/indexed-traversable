@@ -45,7 +45,7 @@ import Data.Sequence                 (Seq)
 import Data.Traversable              (Traversable (..))
 import Data.Tree                     (Tree (..))
 import Data.Void                     (Void)
-
+import GHC.Types (type (@), Total)
 #if __GLASGOW_HASKELL__ >= 702
 import GHC.Generics
        (K1 (..), Par1 (..), Rec1 (..), U1 (..), V1, (:*:) (..), (:+:) (..),
@@ -115,7 +115,7 @@ class Foldable f => FoldableWithIndex i f | f -> i where
   ifoldMap :: Monoid m => (i -> a -> m) -> f a -> m
 
 #if __GLASGOW_HASKELL__ >= 704
-  default ifoldMap :: (TraversableWithIndex i f, Monoid m) => (i -> a -> m) -> f a -> m
+  default ifoldMap :: (Total f, TraversableWithIndex i f, Monoid m) => (i -> a -> m) -> f a -> m
   ifoldMap = ifoldMapDefault
   {-# INLINE ifoldMap #-}
 #endif
@@ -177,7 +177,7 @@ class Foldable f => FoldableWithIndex i f | f -> i where
     where f' i x k z = k $! f i z x
   {-# INLINE ifoldl' #-}
 
-ifoldMapDefault :: (TraversableWithIndex i f, Monoid m) => (i -> a -> m) -> f a -> m
+ifoldMapDefault :: (Total f, TraversableWithIndex i f, Monoid m) => (i -> a -> m) -> f a -> m
 ifoldMapDefault f = getConst #. itraverse (Const #.. f)
 {-# INLINE ifoldMapDefault #-}
 
@@ -199,10 +199,10 @@ class (FunctorWithIndex i t, FoldableWithIndex i t, Traversable t) => Traversabl
   -- @
   -- 'itraverse' ≡ 'itraverseOf' 'itraversed'
   -- @
-  itraverse :: Applicative f => (i -> a -> f b) -> t a -> f (t b)
+  itraverse :: (Total f, Applicative f) => (i -> a -> f b) -> t a -> f (t b)
 
 #if __GLASGOW_HASKELL__ >= 704
-  default itraverse :: (i ~ Int, Applicative f) => (i -> a -> f b) -> t a -> f (t b)
+  default itraverse :: (Total t, i ~ Int, Applicative f, Total f) => (i -> a -> f b) -> t a -> f (t b)
   itraverse f s = snd $ runIndexing (traverse (\a -> Indexing (\i -> i `seq` (i + 1, f i a))) s) 0
   {-# INLINE itraverse #-}
 #endif
@@ -335,42 +335,42 @@ instance TraversableWithIndex Void (Constant e) where
   itraverse _ (Constant a) = pure (Constant a)
   {-# INLINE itraverse #-}
 
-instance (FunctorWithIndex i f, FunctorWithIndex j g) => FunctorWithIndex (i, j) (Compose f g) where
+instance (Total f, Total g, FunctorWithIndex i f, FunctorWithIndex j g) => FunctorWithIndex (i, j) (Compose f g) where
   imap f (Compose fg) = Compose $ imap (\k -> imap (f . (,) k)) fg
   {-# INLINE imap #-}
 
-instance (FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (i, j) (Compose f g) where
+instance (Total f, Total g, FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (i, j) (Compose f g) where
   ifoldMap f (Compose fg) = ifoldMap (\k -> ifoldMap (f . (,) k)) fg
   {-# INLINE ifoldMap #-}
 
-instance (TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (i, j) (Compose f g) where
+instance (Total f, Total g, TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (i, j) (Compose f g) where
   itraverse f (Compose fg) = Compose <$> itraverse (\k -> itraverse (f . (,) k)) fg
   {-# INLINE itraverse #-}
 
-instance (FunctorWithIndex i f, FunctorWithIndex j g) => FunctorWithIndex (Either i j) (Sum f g) where
+instance (Total f, Total g, FunctorWithIndex i f, FunctorWithIndex j g) => FunctorWithIndex (Either i j) (Sum f g) where
   imap q (InL fa) = InL (imap (q . Left)  fa)
   imap q (InR ga) = InR (imap (q . Right) ga)
   {-# INLINE imap #-}
 
-instance (FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (Either i j) (Sum f g) where
+instance (Total f, Total g, FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (Either i j) (Sum f g) where
   ifoldMap q (InL fa) = ifoldMap (q . Left)  fa
   ifoldMap q (InR ga) = ifoldMap (q . Right) ga
   {-# INLINE ifoldMap #-}
 
-instance (TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (Either i j) (Sum f g) where
+instance (Total f, Total g, TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (Either i j) (Sum f g) where
   itraverse q (InL fa) = InL <$> itraverse (q . Left)  fa
   itraverse q (InR ga) = InR <$> itraverse (q . Right) ga
   {-# INLINE itraverse #-}
 
-instance (FunctorWithIndex i f, FunctorWithIndex j g) => FunctorWithIndex (Either i j) (Product f g) where
+instance (Total f, Total g, FunctorWithIndex i f, FunctorWithIndex j g) => FunctorWithIndex (Either i j) (Product f g) where
   imap f (Pair a b) = Pair (imap (f . Left) a) (imap (f . Right) b)
   {-# INLINE imap #-}
 
-instance (FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (Either i j) (Product f g) where
+instance (Total f, Total g, FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (Either i j) (Product f g) where
   ifoldMap f (Pair a b) = ifoldMap (f . Left) a `mappend` ifoldMap (f . Right) b
   {-# INLINE ifoldMap #-}
 
-instance (TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (Either i j) (Product f g) where
+instance (Total f, Total g, TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (Either i j) (Product f g) where
   itraverse f (Pair a b) = liftA2 Pair (itraverse (f . Left) a) (itraverse (f . Right) b)
   {-# INLINE itraverse #-}
 
@@ -394,27 +394,27 @@ instance FunctorWithIndex i m => FunctorWithIndex (e, i) (ReaderT e m) where
   imap f (ReaderT m) = ReaderT $ \k -> imap (f . (,) k) (m k)
   {-# INLINE imap #-}
 
-instance FunctorWithIndex i f => FunctorWithIndex i (Backwards f) where
+instance (Total f, FunctorWithIndex i f) => FunctorWithIndex i (Backwards f) where
   imap f  = Backwards . imap f . forwards
   {-# INLINE imap #-}
 
-instance FoldableWithIndex i f => FoldableWithIndex i (Backwards f) where
+instance (Total f, FoldableWithIndex i f) => FoldableWithIndex i (Backwards f) where
   ifoldMap f = ifoldMap f . forwards
   {-# INLINE ifoldMap #-}
 
-instance TraversableWithIndex i f => TraversableWithIndex i (Backwards f) where
+instance (Total f, TraversableWithIndex i f) => TraversableWithIndex i (Backwards f) where
   itraverse f = fmap Backwards . itraverse f . forwards
   {-# INLINE itraverse #-}
 
-instance FunctorWithIndex i f => FunctorWithIndex i (Reverse f) where
+instance (Total f, FunctorWithIndex i f) => FunctorWithIndex i (Reverse f) where
   imap f = Reverse . imap f . getReverse
   {-# INLINE imap #-}
 
-instance FoldableWithIndex i f => FoldableWithIndex i (Reverse f) where
+instance (Total f, FoldableWithIndex i f) => FoldableWithIndex i (Reverse f) where
   ifoldMap f = getDual #. ifoldMap (Dual #.. f) . getReverse
   {-# INLINE ifoldMap #-}
 
-instance TraversableWithIndex i f => TraversableWithIndex i (Reverse f) where
+instance (Total f, TraversableWithIndex i f) => TraversableWithIndex i (Reverse f) where
   itraverse f = fmap Reverse . forwards . itraverse (Backwards #.. f) . getReverse
   {-# INLINE itraverse #-}
 
@@ -573,7 +573,7 @@ instance (FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (i,
   ifoldMap q (Comp1 fga) = ifoldMap (\k -> ifoldMap (q . (,) k)) fga
   {-# INLINE ifoldMap #-}
 
-instance (TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (i, j) (f :.: g) where
+instance (Total f, Total g, TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (i, j) (f :.: g) where
   itraverse q (Comp1 fga) = Comp1 <$> itraverse (\k -> itraverse (q . (,) k)) fga
   {-# INLINE itraverse #-}
 
@@ -585,7 +585,7 @@ instance (FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (Ei
   ifoldMap q (fa :*: ga) = ifoldMap (q . Left) fa `mappend` ifoldMap (q . Right) ga
   {-# INLINE ifoldMap #-}
 
-instance (TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (Either i j) (f :*: g) where
+instance (Total f, Total g, TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (Either i j) (f :*: g) where
   itraverse q (fa :*: ga) = liftA2 (:*:) (itraverse (q . Left) fa) (itraverse (q . Right) ga)
   {-# INLINE itraverse #-}
 
@@ -599,7 +599,7 @@ instance (FoldableWithIndex i f, FoldableWithIndex j g) => FoldableWithIndex (Ei
   ifoldMap q (R1 ga) = ifoldMap (q . Right) ga
   {-# INLINE ifoldMap #-}
 
-instance (TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (Either i j) (f :+: g) where
+instance (Total f, Total g, TraversableWithIndex i f, TraversableWithIndex j g) => TraversableWithIndex (Either i j) (f :+: g) where
   itraverse q (L1 fa) = L1 <$> itraverse (q . Left) fa
   itraverse q (R1 ga) = R1 <$> itraverse (q . Right) ga
   {-# INLINE itraverse #-}
@@ -660,7 +660,7 @@ skip _ = ()
 -- | Used internally by 'Control.Lens.Traversal.traverseOf_' and the like.
 --
 -- The argument 'a' of the result should not be used!
-newtype Traversed a f = Traversed { getTraversed :: f a }
+newtype f @ a => Traversed a f = Traversed { getTraversed :: f a }
 
 -- See 4.16 Changelog entry for the explanation of "why not Apply f =>"?
 instance Applicative f => Semigroup (Traversed a f) where
@@ -682,7 +682,7 @@ instance Applicative f => Monoid (Traversed a f) where
 -- The argument 'a' of the result should not be used!
 --
 -- See 4.16 Changelog entry for the explanation of "why not Apply f =>"?
-newtype Sequenced a m = Sequenced { getSequenced :: m a }
+newtype m @ a => Sequenced a m = Sequenced { getSequenced :: m a }
 
 instance Monad m => Semigroup (Sequenced a m) where
   Sequenced ma <> Sequenced mb = Sequenced (ma >> mb)
@@ -700,14 +700,14 @@ instance Monad m => Monoid (Sequenced a m) where
 
 -- | 'Applicative' composition of @'Control.Monad.Trans.State.Lazy.State' 'Int'@ with a 'Functor', used
 -- by 'Control.Lens.Indexed.indexed'.
-newtype Indexing f a = Indexing { runIndexing :: Int -> (Int, f a) }
+newtype f @ a => Indexing f a = Indexing { runIndexing :: Int -> (Int, f a) }
 
 instance Functor f => Functor (Indexing f) where
   fmap f (Indexing m) = Indexing $ \i -> case m i of
     (j, x) -> (j, fmap f x)
   {-# INLINE fmap #-}
 
-instance Applicative f => Applicative (Indexing f) where
+instance (Total f, Applicative f) => Applicative (Indexing f) where
   pure x = Indexing $ \i -> (i, pure x)
   {-# INLINE pure #-}
   Indexing mf <*> Indexing ma = Indexing $ \i -> case mf i of

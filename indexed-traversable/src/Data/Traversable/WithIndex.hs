@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP         #-}
-#if __GLASGOW_HASKELL__ >= 704
+#if __GLASGOW_HASKELL__ >= 704 &&  __GLASGOW_HASKELL__ <= 902
 {-# LANGUAGE Safe        #-}
 #elif __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
@@ -26,7 +26,7 @@ import Control.Applicative.Backwards (Backwards (..))
 import Data.Tuple                    (swap)
 
 import qualified Control.Monad.Trans.State.Lazy as Lazy
-
+import GHC.Types (Total)
 import WithIndex
 
 -- | Traverse with an index (and the arguments flipped).
@@ -35,7 +35,7 @@ import WithIndex
 -- 'for' a ≡ 'ifor' a '.' 'const'
 -- 'ifor' ≡ 'flip' 'itraverse'
 -- @
-ifor :: (TraversableWithIndex i t, Applicative f) => t a -> (i -> a -> f b) -> f (t b)
+ifor :: (Total f, TraversableWithIndex i t, Applicative f) => t a -> (i -> a -> f b) -> f (t b)
 ifor = flip itraverse
 {-# INLINE ifor #-}
 
@@ -48,7 +48,7 @@ ifor = flip itraverse
 -- @
 -- 'mapM' ≡ 'imapM' '.' 'const'
 -- @
-imapM :: (TraversableWithIndex i t, Monad m) => (i -> a -> m b) -> t a -> m (t b)
+imapM :: (Total m, TraversableWithIndex i t, Monad m) => (i -> a -> m b) -> t a -> m (t b)
 imapM f = unwrapMonad #. itraverse (WrapMonad #.. f)
 {-# INLINE imapM #-}
 
@@ -60,7 +60,7 @@ imapM f = unwrapMonad #. itraverse (WrapMonad #.. f)
 -- 'forM' a ≡ 'iforM' a '.' 'const'
 -- 'iforM' ≡ 'flip' 'imapM'
 -- @
-iforM :: (TraversableWithIndex i t, Monad m) => t a -> (i -> a -> m b) -> m (t b)
+iforM :: (Total m, TraversableWithIndex i t, Monad m) => t a -> (i -> a -> m b) -> m (t b)
 iforM = flip imapM
 {-# INLINE iforM #-}
 
